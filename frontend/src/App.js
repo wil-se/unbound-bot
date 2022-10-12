@@ -445,7 +445,7 @@ function App() {
                           return <tr key={String(a.orderId)} >
                             <td>{a.orderId}</td>
                             <td>{(parseFloat(a.price) * parseFloat(a.size)).toFixed(4)}</td>
-                            <td>{a.price}</td>
+                            <td>{a.price.toFixed(4)}</td>
                             <td>{a.size}</td>
                             <td>{a.side}</td>
                           </tr>
@@ -471,7 +471,7 @@ function App() {
                           return <tr key={String(a.orderId)}>
                             <td>{a.orderId}</td>
                             <td>{(parseFloat(a.price) * parseFloat(a.size)).toFixed(4)}</td>
-                            <td>{a.price}</td>
+                            <td>{a.price.toFixed(4)}</td>
                             <td>{a.size}</td>
                             <td>{a.side}</td>
                           </tr>
