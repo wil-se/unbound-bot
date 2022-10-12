@@ -1,5 +1,5 @@
-# UNBOUND BOT
-## TODO
+# 🤖 UNBOUND BOT
+## 📝 TODO
 ### Serum:
 - [x] read order book
 - [x] get pair price
