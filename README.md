@@ -1,5 +1,4 @@
 # UNBOUND BOT
----
 ## TODO
 ### Serum:
 - [x] read order book
