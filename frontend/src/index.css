@@ -1,0 +1,108 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #0D1117;
+  /* background-image: url("assets/pattern-opaque.jpeg"); */
+  background-image: url("https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/696993a8-c89b-4689-bd00-dec397e2e0c2/dd27nmj-26102f1f-2fda-446a-b69a-b26a48e2ab10.gif?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvNjk2OTkzYTgtYzg5Yi00Njg5LWJkMDAtZGVjMzk3ZTJlMGMyXC9kZDI3bm1qLTI2MTAyZjFmLTJmZGEtNDQ2YS1iNjlhLWIyNmE0OGUyYWIxMC5naWYifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.fM6tF3xf9Gl0xXqNeGk-vJ-zzQj-mGnIbyY-eZ07LJQ");
+  background-size: 150px;
+  background-attachment: fixed;
+  color: #ffe4ea;
+  font-size: 20px;
+}
+
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.card {
+  background-color: rgb(0, 0, 0, 0.70) !important;
+}
+
+.card-body {
+  background-color: transparent !important;
+}
+
+.card-title {
+  background-color: transparent !important;
+}
+
+.form-text {
+  color: white;
+}
+
+.table>:not(caption)>*>* {
+  color: white;
+}
+
+.modal-content {
+  background-color: rgb(0, 0, 0, 0.9);
+  border-width: 3px;
+  border-color: white;
+}
+
+td {
+  color: black !important;
+}
+
+.btn-primary {
+  background-color: #AD09E4;
+  border-color: #AD09E4;
+}
+
+.btn-primary:hover {
+  background-color: #FEB1C8;
+  border-color: #FEB1C8;
+  color: black;
+}
+
+.card {
+  border-width: 3px;
+  border-color: white;
+  padding-left: 0px;
+  padding-right: 0px;
+}
+
+.card-title {
+  border-bottom-color: white !important;
+  border-bottom-style: solid !important;
+  border-bottom-width: 2px !important;
+}
+
+.navbar {
+  background-color: rgb(0, 0, 0, 0.8);
+}
+
+.table {
+  --bs-table-border-color: #000000;
+}
+
+tr {
+  font-size: 16px;
+}
+
+.form-control {
+  background-color: #fff6db;
+}
+
+.form-select {
+  background-color: #fff6db;
+}
+
+.form-control:disabled, .form-control[readonly] {
+  background-color: #fff6db;
+  opacity: 1;
+}
+
+select option:checked {
+  background-color: #FEB1C8;
+}
+
+select option:hover {
+  background-color: #FEB1C8 !important;
+}
