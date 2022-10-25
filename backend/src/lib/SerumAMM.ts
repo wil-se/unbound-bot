@@ -1,238 +1,257 @@
-import { Connection, PublicKey, Account, Keypair } from '@solana/web3.js';
-import { Market } from '@project-serum/serum';
-import { getOrCreateAssociatedTokenAccount } from '@solana/spl-token';
 import { Logger, ILogObject } from "tslog";
 import { appendFileSync } from "fs";
-import OrderBook,  { IOrderBook } from '../models/OrderBook';
-import Order,  { IOrder } from '../models/Order';
-import { connect, disconnect } from 'mongoose';
+import Config, { IConfig } from '../models/AMMConfig';
+import Serum from './Serum';
+import { getPairInfo } from '../utils'
+import PairPrice, { IPairPrice } from '../models/PairPrice';
+import { PublicKey, Account } from '@solana/web3.js';
+import { getAssociatedTokenAddress } from "@solana/spl-token";
+const FileSystem = require("fs");
 
+
+const defaultConfig = {
+    priceCheckInterval: 1000, // check price every priceCheckIntervalms 
+    priceCheckIntervalDelta: 3600, // save a list of priceCheckIntervalDelta elements max
+    /*
+    the program checks the price every priceCheckInterval milliseconds. 
+    if there are more than priceCheckIntervalDelta then
+    delete the oldest PairPrice object and save a new PairPrice object
+    else save a PairPrice object.
+    the oldest object is of priceCheckIntervalDelta * priceCheckInterval milliseconds ago
+    */
+    maxPriceDivergence: 5, // close positions if divergence between
+    // newest and oldest price is greater than maxPriceDivergence
+    askPercentage: 50, // allocate askPercentage of the base token to asks
+    bidPercentage: 50, // allocate askPercentage of the base token to bids
+    width: 10, // make bids between width-price < price < price+width
+    stretch: 1.1, // scale space between prices of the orders
+    threshold: 0.0, // price-width < -threshold < price < threshold < price+width
+    // there are no bids between threshold
+    // orders will be placed between (price-width and price-threshold)
+    // and between (price+threshold and price width) 
+    a: 1, // parabola equation parameteres   
+    b: 1, // ax^2+bx+c used to get the sizes of orders
+    c: 1  // the sum of the sizes of an ask or a bid list must be 1
+    // so it can be proportioned with askPercentage and bidPercentage
+
+    // run python3 charts/orders.py to display the amm config visually
+} as IConfig
+
+// log formatter
 function logToTransport(logObject: ILogObject) {
-  appendFileSync("logs/SerumAMM.log", `[${logObject.date.toLocaleString()}] - ${logObject.logLevel.toUpperCase()} - function ${logObject.functionName}():\n${logObject.loggerName} ${logObject.argumentsArray}` + "\n");
+    appendFileSync("logs/SerumAMM.log", `[${logObject.date.toLocaleString()}] - ${logObject.logLevel.toUpperCase()} - function ${logObject.functionName}():\n${logObject.loggerName} ${logObject.argumentsArray}` + "\n");
 }
 
-class SerumAMM {
-  log: Logger = new Logger({ name: "AMM", printLogMessageInNewLine: true });
-  rpc: string;
-  connection: Connection;
-  marketAddressPubKey: string;
-  programAddressPubKey: string;
-  secretKey: number[];
-  baseMintAddress?: string;
-  quoteMintAddress?: string;
-  // import bn and replace orderId: any; with orderId: BN;
-  asks?: { orderId: any; price: number; size: number; side: "buy" | "sell"; }[];
-  bids?: { orderId: any; price: number; size: number; side: "buy" | "sell"; }[];
-  dbConnection?: any;
-  dbName: string;
+export default class SerumAMM {
+    serum: Serum;
+    config: IConfig;
+    log: Logger = new Logger({ name: "AMM", printLogMessageInNewLine: true });
 
-  constructor(dbName: string, rpc: string, secretKey?: number[], marketAddressPubKey?: string, programAddressPubKey?: string) {
-    this.rpc = rpc;
-    this.connection = new Connection(this.rpc);
-    this.marketAddressPubKey = marketAddressPubKey ? marketAddressPubKey : '';
-    this.programAddressPubKey = programAddressPubKey ? programAddressPubKey : '';
-    this.secretKey = secretKey ? secretKey : [];
-    this.dbName = dbName;
-    this.log.attachTransport(
-      {
-        silly: logToTransport,
-        debug: logToTransport,
-        trace: logToTransport,
-        info: logToTransport,
-        warn: logToTransport,
-        error: logToTransport,
-        fatal: logToTransport,
-      },
-      "debug"
-    );
-    this.log.info('Initialized')
-  }
-
-  async init() {
-    this.dbConnection = await connect(process.env.DB_CONN_STRING as string + this.dbName);
-  }
-
-  async terminate() {
-    await this.dbConnection.disconnect();
-  }
-
-  async getMarket() {
-    this.log.info(`Fetching market ${this.marketAddressPubKey} for program ${this.programAddressPubKey}`)
-    return await Market.load(this.connection, new PublicKey(this.marketAddressPubKey), {}, new PublicKey(this.programAddressPubKey));
-  }
-
-  async fetchOrderBook() {
-    try {
-      let market = await this.getMarket();
-      let asks = await market.loadAsks(this.connection);
-      let bids = await market.loadBids(this.connection);
-      let asks_result = [];
-      for (let order of asks) {
-        asks_result.push({
-          'orderId': order.orderId.toString(),
-          'price': order.price,
-          'size': order.size,
-          'side': order.side
-        });
-      }
-      let bids_result = [];
-      for (let order of bids) {
-        bids_result.push({
-          'orderId': order.orderId.toString(),
-          'price': order.price,
-          'size': order.size,
-          'side': order.side
-        });
-      }
-      this.baseMintAddress = market.baseMintAddress.toString();
-      this.quoteMintAddress = market.quoteMintAddress.toString();
-      this.asks = asks_result;
-      this.bids = bids_result;
-      this.log.info('Fetching orderbook');
-
-      const orderBook: IOrderBook = new OrderBook({
-        asks: asks_result,
-        bids: bids_result,
-      });
-      await orderBook.save();
-      
-      return [
-        asks_result,
-        bids_result,
-        market.baseMintAddress.toString(),
-        market.quoteMintAddress.toString()
-      ];
-    } catch (e) {
-      this.log.error((e as Error).message);
-      return [[], [], '', '']
+    constructor(dbName: string, rpc: string, secretKey?: number[], marketAddressPubKey?: string, programAddressPubKey?: string) {
+        this.serum = new Serum(dbName, rpc, secretKey, marketAddressPubKey, programAddressPubKey);
+        this.config = defaultConfig;
+        this.log.attachTransport(
+            {
+              silly: logToTransport,
+              debug: logToTransport,
+              trace: logToTransport,
+              info: logToTransport,
+              warn: logToTransport,
+              error: logToTransport,
+              fatal: logToTransport,
+            },
+            "debug"
+          );
     }
-  }
 
-  async placeOrder(side: 'buy' | 'sell', price: number, size: number, orderType: 'limit' | 'ioc' | 'postOnly') {
-    try {
-      let market = await this.getMarket();
-      let owner = new Account(this.secretKey);
-      let payer: PublicKey;
-      if (side === 'sell') {
-        payer = new PublicKey(owner.publicKey);
-      } else {
-        let associatedToken = await getOrCreateAssociatedTokenAccount(this.connection, owner, market.quoteMintAddress, owner.publicKey);
-        payer = new PublicKey(associatedToken.address);
-      }
-      let tx = await market.placeOrder(this.connection, {
-        owner,
-        payer,
-        side: side,
-        price: price,
-        size: size,
-        orderType: orderType,
-      });
-
-      let order: IOrder = new Order({
-        owner: owner.publicKey.toString(),
-        payer: payer.toString(),
-        side: side,
-        price: price,
-        size: size,
-        orderType: orderType,
-        tx: tx
-      });
-      order.save();
-
-      this.log.info(`Order sent, tx: ${tx}`)
-      return [true, tx];
-    } catch (e) {
-      // this.log.error((e as Error).message);
-      return [false, ''];
-    }
-  }
-
-  async getOrders() {
-    try {
-      let market = await this.getMarket();
-      let orders = await market.loadOrdersForOwner(this.connection, new Account(this.secretKey).publicKey);
-      this.log.info(`Fetching orders`);
-      return orders;
-    } catch (e) {
-      this.log.error((e as Error).message);
-      return [];
-    }
-  }
-
-  async cancelAllOrders() {
-    try {
-      let market = await this.getMarket();
-      let orders = await market.loadOrdersForOwner(this.connection, new Account(this.secretKey).publicKey);
-      let owner = new Account(this.secretKey);
-      let txs: string[] = [];
-      for (let order of orders) {
-        txs.push(await market.cancelOrder(this.connection, owner, order));
-      }
-      this.log.info(`Cancelling all orders, txs: ${txs}`);
-      return [true, txs];
-    } catch (e) {
-      this.log.error((e as Error).message);
-      return [false, []];
-    }
-  }
-
-  async cancelOrder(orderId: string) {
-    try {
-      let market = await this.getMarket();
-      let orders = await market.loadOrdersForOwner(this.connection, new Account(this.secretKey).publicKey);
-      let owner = new Account(this.secretKey);
-      let tx: string = '';
-      let success: boolean = false;
-      for (let i = 0; i < 5; i++) {
-        for (let order of orders) {
-          if (orderId === `0${order.orderId.toString(16)}`) {
-            tx = await market.cancelOrder(this.connection, owner, order);
-            success = true;
-          }
+    async setConfig(id: string, priceCheckInterval: number, priceCheckIntervalDelta: number, width: number, stretch: number, threshold: number, a: number, b: number, c: number) {
+        let conf: IConfig | null = await Config.findById(id);
+        if (conf !== null) {
+            conf.priceCheckInterval = priceCheckInterval
+            conf.priceCheckIntervalDelta = priceCheckIntervalDelta
+            conf.width = width
+            conf.stretch = stretch
+            conf.threshold = threshold
+            conf.a = a
+            conf.b = b
+            conf.c = c
+            conf.save();
         }
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        orders = await market.loadOrdersForOwner(this.connection, new Account(this.secretKey).publicKey);
-        this.log.info('Cancelling all orders');
-      }
-      this.log.info(`Cancelling order, tx: ${tx}`);
-      return [success, tx];
-    } catch (e) {
-      this.log.error((e as Error).message);
-      return [false, ''];
     }
-  }
 
-  async getFilledOrders() {
-    try {
-      let market = await this.getMarket();
-      let fills = await market.loadFills(this.connection);
-      this.log.info(`Getting filled orders`);
-      return [fills];
-    } catch (e) {
-      this.log.error((e as Error).message);
-      return [];
-    }
-  }
-
-  async settleFunds() {
-    try {
-      let market = await this.getMarket();
-      let owner = new Account(this.secretKey);
-      let txs: string[] = [];
-      for (let openOrders of await market.findOpenOrdersAccountsForOwner(this.connection, owner.publicKey,)) {
-        if (openOrders.baseTokenFree > 0 || openOrders.quoteTokenFree > 0) {
-          let baseTokenAccount = new PublicKey(await (await getOrCreateAssociatedTokenAccount(this.connection, owner, market.baseMintAddress, owner.publicKey)).address);
-          let quoteTokenAccount = new PublicKey(await (await getOrCreateAssociatedTokenAccount(this.connection, owner, market.quoteMintAddress, owner.publicKey)).address);
-          txs.push(await market.settleFunds(this.connection, owner, openOrders, baseTokenAccount, quoteTokenAccount));
+    async getConfig(id?: string) {
+        if (id !== undefined) {
+            return await Config.findById(id) as IConfig;
+        } else {
+            let conf = await Config.find({name: this.serum.dbName});
+            return conf !== undefined ? conf[0] : null;
         }
-      }
-      this.log.info(`Settling funds, txs: ${txs}`);
-      return [true, txs];
-    } catch (e) {
-      this.log.error((e as Error).message);
-      return [false, []];
     }
-  }
+
+    async updateConfig(id?: string) {
+        let conf: IConfig | null = await this.getConfig(id === undefined ? undefined : id);
+        if (conf !== null) {
+            this.config.priceCheckInterval = conf.priceCheckInterval
+            this.config.priceCheckIntervalDelta = conf.priceCheckIntervalDelta
+            this.config.width = conf.width
+            this.config.stretch = conf.stretch
+            this.config.threshold = conf.threshold
+            this.config.a = conf.a
+            this.config.b = conf.b
+            this.config.c = conf.c
+        }
+    }
+
+    async updatePrice() {
+        let prices: IPairPrice[] = await PairPrice.find().sort('timestamp');
+        if (prices.length > this.config.priceCheckIntervalDelta)
+            for (let i = 0; i < prices.length - this.config.priceCheckIntervalDelta + 1; i++)
+                await prices[i].delete();
+
+        let p = await getPairInfo(this.serum.baseMintAddress as string, this.serum.quoteMintAddress as string);
+        if ( p.success) {
+            let price: IPairPrice = new PairPrice({
+                pair: this.serum.dbName,
+                price: p.result.price
+            })
+            await price.save();
+            this.log.info(`price updated: ${p.result.price}`);
+            return p.result.price;
+        }
+        return -1;
+    }
+
+    async priceDivergence() {
+        let prices: IPairPrice[] = await PairPrice.find().sort('timestamp');
+        let older = prices[0].price;
+        let newer = prices[prices.length - 1].price;
+        let percentage = 100 * (Math.abs(older - newer) / ((older + newer) / 2));
+        return percentage;
+    }
+
+    async buildOrders() {
+        let prices: IPairPrice[] = await PairPrice.find().sort('timestamp');
+        let price = prices[prices.length - 1].price;
+        let stretch = this.config.stretch;
+        let width = this.config.width;
+        let order = 0;
+        while (width <= 1) {
+            width *= 10;
+            order++;
+        }
+        let threshold = this.config.threshold;
+        let a = this.config.a;
+        let b = this.config.b;
+        let c = this.config.c;
+
+        let price_bids = [];
+        let size_bids = [];
+        let k = 0;
+        while (Math.pow(stretch, k) / width < width) {
+            let step = Math.pow(stretch, k) / width;
+            if (step > threshold) {
+                price_bids.push(price - (step/Math.pow(10, order)));
+                size_bids.push(0);
+            }
+            k++;
+        }
+        for (let y = 0; y < price_bids.length; y++)
+            size_bids[y] = (a * Math.pow(y + 1, 2) + (b * y) + c);
+        let size_bids_sum = size_bids.reduce((total, current) => { return total + current });
+        for (let y = 0; y < price_bids.length; y++)
+            size_bids[y] = size_bids[y] / size_bids_sum;
+
+
+        let price_asks = [];
+        let size_asks = [];
+        k = 0;
+        while (Math.pow(stretch, k) / width < width) {
+            let step = Math.pow(stretch, k) / width;
+            if (step > threshold) {
+                price_asks.push(price + (step/Math.pow(10, order)));
+                size_asks.push(0);
+            }
+            k++;
+        }
+        for (let y = 0; y < price_asks.length; y++)
+            size_asks[y] = (a * Math.pow(y + 1, 2) + (b * y) + c);
+        let size_asks_sum = size_asks.reduce((total, current) => { return total + current });
+        for (let y = 0; y < price_asks.length; y++)
+            size_asks[y] = size_asks[y] / size_asks_sum;
+
+
+        let data = {
+            "price_bids": price_bids,
+            "size_bids": size_bids,
+            "price_asks": price_asks,
+            "size_asks": size_asks,
+            "price": price
+        }
+        FileSystem.writeFile('src/temp/orders.json', JSON.stringify(data), (err: any) => { if (err) throw err});
+
+        return [price_bids, size_bids, price_asks, size_asks, price]
+    }
+
+    async sendOrders() {
+        let askPercentage = this.config.askPercentage
+        let bidPercentage = this.config.bidPercentage
+        if ( askPercentage + bidPercentage !== 100)
+            return
+        let associatedBaseTokenAddress = await getAssociatedTokenAddress(new PublicKey(this.serum.baseMintAddress as string), new Account(this.serum.secretKey).publicKey);
+        let associatedBaseTokenBalance = await this.serum.connection.getTokenAccountBalance(associatedBaseTokenAddress);
+        let amount = associatedBaseTokenBalance.value.uiAmount as number;
+        let askAmount = (askPercentage*amount)/100;
+        let bidAmount = (bidPercentage*amount)/100;
+        
+        this.log.info('sending orders')
+        this.log.info(`total ${this.serum.baseMintAddress} amount: ${amount}`);
+        this.log.info(`allocated ask amount: ${askAmount}`);
+        this.log.info(`allocated bid amount: ${bidAmount}`);
+        
+        let [price_bids, size_bids, price_asks, size_asks, price] = await this.buildOrders();
+        
+        let bids_sizes = [];
+        this.log.info('bids:');
+        for ( let bid=0; bid<(price_bids as number[]).length; bid++ ) {
+            // this.serum.placeOrder('buy', (price_bids as number[])[bid], (size_bids as number[])[bid]*bidAmount, 'limit');
+            let price = (price_bids as number[])[bid];
+            let amount = (size_bids as number[])[bid]*bidAmount;
+            this.log.info(`buy ${price} ${amount}=${(size_bids as number[])[bid]}% ${amount*price} limit`);
+            bids_sizes.push((size_bids as number[])[bid]*bidAmount);
+        }
+        let bids_total = bids_sizes.reduce((total, current) => { return total + current });
+        this.log.info(`sum of all bids sizes: ${bids_total}`);
+
+        let asks_sizes = [];
+        this.log.info('asks:');
+        for ( let ask=0; ask<(price_asks as number[]).length; ask++ ) {
+            // this.serum.placeOrder('sell', (price_asks as number[])[bid], (size_asks as number[])[bid]*askAmount, 'limit');
+            let price = (price_asks as number[])[ask];
+            let amount = (size_asks as number[])[ask]*askAmount;
+            this.log.info(`sell ${price} ${amount}=${(size_asks as number[])[ask]}% ${price*amount} limit`);
+            asks_sizes.push((size_asks as number[])[ask]*askAmount);
+        }
+        let asks_total = asks_sizes.reduce((total, current) => { return total + current });
+        this.log.info(`sum of all ask sizes: ${asks_total}`);
+    }
+
+    async makeMarket() {
+        let orders = await this.serum.getOrders();
+        this.log.info(`number of orders: ${orders.length}\norders:\n${orders}`);
+        let priceDivergence = await this.priceDivergence();
+        this.log.info(`price divergence: ${priceDivergence}`);
+        if ( Math.abs(priceDivergence) > this.config.maxPriceDivergence && orders.length !== 0 ) {
+            await this.serum.cancelAllOrders();
+            await this.serum.settleFunds();
+        }
+        let [price_bids, size_bids, price_asks, size_asks, price] = await this.buildOrders();
+        this.log.info(`number of orders built: ${(price_bids as number[]).length + (price_asks as number[]).length}`)
+        if ( orders.length === 0 ) {
+            await this.sendOrders();
+        } else if ( (price_bids as number[]).length + (price_asks as number[]).length !== orders.length ) {
+            await this.serum.cancelAllOrders();
+            await this.serum.settleFunds();
+            await this.sendOrders();
+        }
+    }
 }
-
-export default SerumAMM;

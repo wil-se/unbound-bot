@@ -1,0 +1,9 @@
+{
+    "priceCheckInterval": 1,
+    "width": 10,
+    "stretch": 1.1,
+    "threshold": 0,
+    "a": 1,
+    "b": 1,
+    "c": 1000
+}

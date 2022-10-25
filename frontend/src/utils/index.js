@@ -1,5 +1,5 @@
 import { API_URL } from '../const';
-const axios = require('axios').default;
+import axios from 'axios';
 
 async function getAsks(marketAddress, programAddress) {
     return await axios.get(API_URL+`/asks?marketAddress=${marketAddress}&programAddress=${programAddress}`);

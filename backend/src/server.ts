@@ -121,6 +121,7 @@ app.get('/settlefunds', async (req: Request, res: Response) => {
     try {
         const bot: SerumMarket = new SerumMarket(rpcUrl, dev_private_key,  req.query.marketAddress as string, req.query.programAddress as string);
         let result = await bot.settleFunds();
+        console.log(result);
         res.send(result);
     } catch (e) {
         console.log(e);

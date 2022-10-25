@@ -1,8 +1,5 @@
 import dotenv from 'dotenv';
-import { connect, disconnect } from 'mongoose';
 import SerumAMM from './lib/SerumAMM';
-import OrderBook,  { IOrderBook } from './models/OrderBook';
-
 dotenv.config();
 
 
@@ -12,11 +9,32 @@ const marketAddress = '9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT';
 const programAddress = '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin';
 
 const main = async () => {
-  let amm = new SerumAMM('SOLUSDC' ,rpcUrl, dev_private_key, marketAddress, programAddress);
-  amm.init();
-  
-  
-  amm.terminate();
+  let amm = new SerumAMM('SOLUSDC', rpcUrl, dev_private_key, marketAddress, programAddress);
+  await amm.serum.init();
+  await amm.serum.fetchOrderBook();
+
+  const updateConfig = async () => {
+    while (true) {
+        await amm.updateConfig();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  };
+  const updatePrice = async () => {
+    while (true) {
+        await amm.updatePrice();
+        await new Promise(resolve => setTimeout(resolve, amm.config.priceCheckInterval));
+    }
+  };
+  const makeMarket = async () => {
+    while (true) {
+        await amm.makeMarket();
+        await new Promise(resolve => setTimeout(resolve, 4000));
+    }
+  };
+
+  updateConfig();
+  updatePrice();
+  makeMarket();
 }
 
 main();
