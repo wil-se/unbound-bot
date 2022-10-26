@@ -12,3 +12,5 @@ visualize the AMM orders distribution config running:
 python3 charts/orders.py
 ```
 matplotlib and tkinter must be installed first
+
+run MongoDB Compass to set bot config and visualize data
