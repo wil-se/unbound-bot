@@ -6,6 +6,7 @@ import { appendFileSync } from "fs";
 import OrderBook,  { IOrderBook } from '../models/OrderBook';
 import Order,  { IOrder } from '../models/Order';
 import { connect, disconnect } from 'mongoose';
+import { DB_CONN_STRING } from '../config/env';
 
 function logToTransport(logObject: ILogObject) {
   appendFileSync("logs/SerumAMM.log", `[${logObject.date.toLocaleString()}] - ${logObject.logLevel.toUpperCase()} - function ${logObject.functionName}():\n${logObject.loggerName} ${logObject.argumentsArray}` + "\n");
@@ -49,7 +50,7 @@ class Serum {
   }
 
   async init() {
-    this.dbConnection = await connect(process.env.DB_CONN_STRING as string + this.dbName);
+    this.dbConnection = await connect(DB_CONN_STRING + this.dbName);
   }
 
   async terminate() {
