@@ -102,20 +102,19 @@ export default class SerumAMM {
         }
     }
 
-    async updatePrice() {
+    async updatePrice(reversed = true) {
         let prices: IPairPrice[] = await PairPrice.find().sort('timestamp');
         if (prices.length > this.config.priceCheckIntervalDelta)
             for (let i = 0; i < prices.length - this.config.priceCheckIntervalDelta + 1; i++)
                 await prices[i].delete();
-
         let p = await getPairInfo(this.serum.baseMintAddress as string, this.serum.quoteMintAddress as string);
         if ( p.success) {
             let price: IPairPrice = new PairPrice({
                 pair: this.serum.dbName,
-                price: p.result.price
+                price: reversed ? p.result.reversedPrice : p.result.price
             })
             await price.save();
-            this.log.info(`price updated: ${p.result.price}`);
+            this.log.info(`price updated: ${reversed ? p.result.reversedPrice : p.result.price}`);
             return p.result.price;
         }
         return -1;
@@ -193,8 +192,8 @@ export default class SerumAMM {
     }
 
     async sendOrders() {
-        let askPercentage = this.config.askPercentage
-        let bidPercentage = this.config.bidPercentage
+        let askPercentage = this.config.askPercentage;
+        let bidPercentage = this.config.bidPercentage;
         if ( askPercentage + bidPercentage !== 100)
             return
         let associatedBaseTokenAddress = await getAssociatedTokenAddress(new PublicKey(this.serum.baseMintAddress as string), new Account(this.serum.secretKey).publicKey);
@@ -213,11 +212,16 @@ export default class SerumAMM {
         let bids_sizes = [];
         this.log.info('bids:');
         for ( let bid=0; bid<(price_bids as number[]).length; bid++ ) {
-            // this.serum.placeOrder('buy', (price_bids as number[])[bid], (size_bids as number[])[bid]*bidAmount, 'limit');
-            let price = (price_bids as number[])[bid];
-            let amount = (size_bids as number[])[bid]*bidAmount;
+            let price = parseFloat(((price_bids as number[])[bid]).toFixed(8));
+            let amount = parseFloat(((size_bids as number[])[bid]*bidAmount).toFixed(0));
+            let bids_total = bids_sizes.reduce((total, current) => { return total + current });
+            let size = parseFloat(((size_bids as number[])[bid]*bidAmount).toFixed(0));
+            if( bids_total+size > bidAmount ) {
+                size = bidAmount - bids_total
+            }
+            bids_sizes.push(size);
             this.log.info(`buy ${price} ${amount}=${(size_bids as number[])[bid]}% ${amount*price} limit`);
-            bids_sizes.push((size_bids as number[])[bid]*bidAmount);
+            // this.serum.placeOrder('buy', (price_bids as number[])[bid], (size_bids as number[])[bid]*bidAmount, 'limit');
         }
         let bids_total = bids_sizes.reduce((total, current) => { return total + current });
         this.log.info(`sum of all bids sizes: ${bids_total}`);
@@ -225,11 +229,16 @@ export default class SerumAMM {
         let asks_sizes = [];
         this.log.info('asks:');
         for ( let ask=0; ask<(price_asks as number[]).length; ask++ ) {
+            let price = ((price_asks as number[])[ask]).toFixed(8);
+            let amount = ((size_asks as number[])[ask]*askAmount).toFixed(0);
+            let asks_total = asks_sizes.reduce((total, current) => { return total + current });
+            let size = parseFloat(((size_asks as number[])[ask]*askAmount).toFixed(0))
+            if( asks_total+size > askAmount ) {
+                size = askAmount - asks_total
+            }
+            asks_sizes.push(size);
+            this.log.info(`sell ${price} ${amount}=${(size_asks as number[])[ask]}% ${parseFloat(price)*parseFloat(amount)} limit`);
             // this.serum.placeOrder('sell', (price_asks as number[])[bid], (size_asks as number[])[bid]*askAmount, 'limit');
-            let price = (price_asks as number[])[ask];
-            let amount = (size_asks as number[])[ask]*askAmount;
-            this.log.info(`sell ${price} ${amount}=${(size_asks as number[])[ask]}% ${price*amount} limit`);
-            asks_sizes.push((size_asks as number[])[ask]*askAmount);
         }
         let asks_total = asks_sizes.reduce((total, current) => { return total + current });
         this.log.info(`sum of all ask sizes: ${asks_total}`);
