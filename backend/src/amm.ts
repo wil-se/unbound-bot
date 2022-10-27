@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import SerumAMM from './lib/SerumAMM';
 dotenv.config();
 import { PRIVATE_KEY, RPCURL, MARKETADDRESS, PROGRAMADDRESS, PAIRNAME, MAKEMARKETINTERVAL } from './config/env';
+import Config, { IConfig } from './models/AMMConfig';
 
 
 const main = async () => {
