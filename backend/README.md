@@ -15,3 +15,12 @@ python3 charts/orders.py
 matplotlib and tkinter must be installed first
 
 run MongoDB Compass to set bot config and visualize data
+
+start database
+```
+brew services start mongodb-community@6.0
+```
+stop database
+```
+brew services stop mongodb-community@6.0
+```
