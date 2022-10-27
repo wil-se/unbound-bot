@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import SerumAMM from './lib/SerumAMM';
 dotenv.config();
-import { PAIRNAME, PAIRNAME, RPCURL, PRIVATE_KEY, MARKETADDRESS, PROGRAMADDRESS } from './config/env';
+import { PAIRNAME, RPCURL, PRIVATE_KEY, MARKETADDRESS, PROGRAMADDRESS } from './config/env';
 import Config, { IConfig } from './models/AMMConfig';
 
 
