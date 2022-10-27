@@ -9,6 +9,7 @@ npx ts-node src/amm.ts
 
 visualize the AMM orders distribution config running:
 ```
+source venv/bin/activate
 python3 charts/orders.py
 ```
 matplotlib and tkinter must be installed first
