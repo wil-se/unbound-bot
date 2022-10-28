@@ -246,7 +246,7 @@ export default class SerumAMM {
             this.log.info('bids:');
             for (let bid = 0; bid < (price_bids as number[]).length; bid++) {
                 let price = parseFloat(((price_bids as number[])[bid]).toFixed(8));
-                let amount = parseFloat(((size_bids as number[])[bid] * bidAmount).toFixed(0));
+                let amount = parseFloat(((size_bids as number[])[bid] * bidAmount).toFixed(0))+1;
                 let bids_total = bids_sizes.length === 0 ? 0 : bids_sizes.reduce((total, current) => { return total + current });
                 let size = parseFloat(((size_bids as number[])[bid] * bidAmount).toFixed(0));
                 if (bids_total + size > bidAmount) {
@@ -262,15 +262,15 @@ export default class SerumAMM {
             let asks_sizes = [];
             this.log.info('asks:');
             for (let ask = 0; ask < (price_asks as number[]).length; ask++) {
-                let price = ((price_asks as number[])[ask]).toFixed(8);
-                let amount = ((size_asks as number[])[ask] * askAmount).toFixed(0);
+                let price = parseFloat(((price_asks as number[])[ask]).toFixed(8));
+                let amount = parseFloat(((size_asks as number[])[ask] * askAmount).toFixed(0))+1;
                 let asks_total = asks_sizes.length === 0 ? 0 : asks_sizes.reduce((total, current) => { return total + current });
                 let size = parseFloat(((size_asks as number[])[ask] * askAmount).toFixed(0))
                 if (asks_total + size > askAmount) {
                     size = askAmount - asks_total
                 }
                 asks_sizes.push(size);
-                this.log.info(`sell ${price} ${amount}=${(size_asks as number[])[ask]}% ${parseFloat(price) * parseFloat(amount)} limit`);
+                this.log.info(`sell ${price} ${amount}=${(size_asks as number[])[ask]}% ${price * amount} limit`);
                 !this.paper && this.serum.placeOrder('sell', (price_asks as number[])[ask], (size_asks as number[])[ask] * askAmount, 'limit');
             }
             let asks_total = asks_sizes.reduce((total, current) => { return total + current });
