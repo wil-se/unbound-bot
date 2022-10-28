@@ -7,6 +7,7 @@ import pkg from 'bs58';
 const { decode } = pkg;
 
 const main = async () => {
+  let paper = process.argv[2] === 'paper';
   let privateKey: number[] = [];
 
   if ( typeof PRIVATE_KEY === 'string' ) {
@@ -17,7 +18,7 @@ const main = async () => {
   }
 
   let amm = new SerumAMM(
-    PAIRNAME, RPCURL, privateKey, MARKETADDRESS, PROGRAMADDRESS);
+    PAIRNAME, RPCURL, privateKey, MARKETADDRESS, PROGRAMADDRESS, paper=paper);
   await amm.serum.init();
   await amm.serum.fetchOrderBook();
 

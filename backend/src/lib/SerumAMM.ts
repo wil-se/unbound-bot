@@ -23,15 +23,15 @@ const defaultConfig = {
     // newest and oldest price is greater than maxPriceDivergence
     askPercentage: 50, // allocate askPercentage of the base token to asks
     bidPercentage: 50, // allocate askPercentage of the base token to bids
-    width: 10, // make bids between width-price < price < price+width
+    width: 10.0, // make bids between width-price < price < price+width
     stretch: 1.1, // scale space between prices of the orders
-    threshold: 0.0, // price-width < -threshold < price < threshold < price+width
+    threshold: 0.1, // price-width < -threshold < price < threshold < price+width
     // there are no bids between threshold
     // orders will be placed between (price-width and price-threshold)
     // and between (price+threshold and price width) 
-    a: 1, // parabola equation parameteres   
-    b: 1, // ax^2+bx+c used to get the sizes of orders
-    c: 1  // the sum of the sizes of an ask or a bid list must be 1
+    a: 1.1, // parabola equation parameteres   
+    b: 1.1, // ax^2+bx+c used to get the sizes of orders
+    c: 1.1  // the sum of the sizes of an ask or a bid list must be 1
     // so it can be proportioned with askPercentage and bidPercentage
 
     // run python3 charts/orders.py to display the amm config visually
@@ -46,8 +46,9 @@ export default class SerumAMM {
     serum: Serum;
     config: IConfig;
     log: Logger = new Logger({ name: "AMM", printLogMessageInNewLine: true });
+    paper: boolean;
 
-    constructor(dbName: string, rpc: string, secretKey?: number[], marketAddressPubKey?: string, programAddressPubKey?: string) {
+    constructor(dbName: string, rpc: string, secretKey?: number[], marketAddressPubKey?: string, programAddressPubKey?: string, paper = true) {
         this.serum = new Serum(dbName, rpc, secretKey, marketAddressPubKey, programAddressPubKey);
         this.config = defaultConfig;
         this.log.attachTransport(
@@ -62,6 +63,7 @@ export default class SerumAMM {
             },
             "debug"
         );
+        this.paper = paper;
     }
 
     async setConfig(id: string, priceCheckInterval: number, priceCheckIntervalDelta: number, width: number, stretch: number, threshold: number, a: number, b: number, c: number) {
@@ -253,7 +255,7 @@ export default class SerumAMM {
                 }
                 bids_sizes.push(size);
                 this.log.info(`buy ${price} ${amount}=${(size_bids as number[])[bid]}% ${amount * price} limit`);
-                this.serum.placeOrder('buy', (price_bids as number[])[bid], (size_bids as number[])[bid]*bidAmount, 'limit');
+                !this.paper && this.serum.placeOrder('buy', (price_bids as number[])[bid], (size_bids as number[])[bid] * bidAmount, 'limit');
             }
             let bids_total = bids_sizes.reduce((total, current) => { return total + current });
             this.log.info(`sum of all bids sizes: ${bids_total}`);
@@ -270,7 +272,7 @@ export default class SerumAMM {
                 }
                 asks_sizes.push(size);
                 this.log.info(`sell ${price} ${amount}=${(size_asks as number[])[ask]}% ${parseFloat(price) * parseFloat(amount)} limit`);
-                this.serum.placeOrder('sell', (price_asks as number[])[ask], (size_asks as number[])[ask]*askAmount, 'limit');
+                !this.paper && this.serum.placeOrder('sell', (price_asks as number[])[ask], (size_asks as number[])[ask] * askAmount, 'limit');
             }
             let asks_total = asks_sizes.reduce((total, current) => { return total + current });
             this.log.info(`sum of all ask sizes: ${asks_total}`);
@@ -289,14 +291,16 @@ export default class SerumAMM {
                 await this.serum.cancelAllOrders();
                 await this.serum.settleFunds();
             }
-            let [price_bids, size_bids, price_asks, size_asks, price] = await this.buildOrders();
-            this.log.info(`number of orders built: ${(price_bids as number[]).length + (price_asks as number[]).length}`)
-            if (orders.length === 0) {
-                await this.sendOrders();
-            } else if ((price_bids as number[]).length + (price_asks as number[]).length !== orders.length) {
-                await this.serum.cancelAllOrders();
-                await this.serum.settleFunds();
-                await this.sendOrders();
+            if (priceDivergence <= this.config.maxPriceDivergence) {
+                let [price_bids, size_bids, price_asks, size_asks, price] = await this.buildOrders();
+                this.log.info(`number of orders built: ${(price_bids as number[]).length + (price_asks as number[]).length}`)
+                if (orders.length === 0) {
+                    await this.sendOrders();
+                } else if ((price_bids as number[]).length + (price_asks as number[]).length !== orders.length) {
+                    await this.serum.cancelAllOrders();
+                    await this.serum.settleFunds();
+                    await this.sendOrders();
+                }
             }
         } catch (e) {
             this.log.info((e as Error).message);
