@@ -179,7 +179,7 @@ export default class SerumAMM {
             while (Math.pow(stretch, k) / width < width) {
                 let step = Math.pow(stretch, k) / width;
                 if (step > threshold) {
-                    price_bids.push(-(price + (step / Math.pow(10, order))));
+                    price_bids.push((price - (step / Math.pow(10, order))));
                     size_bids.push(0);
                 }
                 k++;
@@ -242,11 +242,6 @@ export default class SerumAMM {
             this.log.info(`allocated bid amount: ${bidAmount}`);
 
             let [price_bids, size_bids, price_asks, size_asks, price] = await this.buildOrders();
-            console.log(price_bids)
-            console.log(size_bids)
-            console.log(price_asks)
-            console.log(size_asks)
-
             let bids_sizes = [];
             this.log.info('bids:');
             for (let bid = 0; bid < (price_bids as number[]).length; bid++) {
