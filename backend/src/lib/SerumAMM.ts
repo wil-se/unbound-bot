@@ -243,6 +243,11 @@ export default class SerumAMM {
 
             let [price_bids, size_bids, price_asks, size_asks, price] = await this.buildOrders();
 
+            console.log(price_bids)
+            console.log(size_bids)
+            console.log(price_asks)
+            console.log(size_asks)
+
             let bids_sizes = [];
             this.log.info('bids:');
             for (let bid = 0; bid < (price_bids as number[]).length; bid++) {
