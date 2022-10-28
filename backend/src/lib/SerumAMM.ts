@@ -242,6 +242,10 @@ export default class SerumAMM {
             this.log.info(`allocated bid amount: ${bidAmount}`);
 
             let [price_bids, size_bids, price_asks, size_asks, price] = await this.buildOrders();
+            console.log(price_bids)
+            console.log(size_bids)
+            console.log(price_asks)
+            console.log(size_asks)
 
             let bids_sizes = [];
             this.log.info('bids:');
