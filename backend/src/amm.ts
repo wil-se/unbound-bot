@@ -3,11 +3,23 @@ import SerumAMM from './lib/SerumAMM';
 dotenv.config();
 import { PRIVATE_KEY, RPCURL, MARKETADDRESS, PROGRAMADDRESS, PAIRNAME, MAKEMARKETINTERVAL } from './config/env';
 import Config, { IConfig } from './models/AMMConfig';
-
+import pkg from 'bs58';
+const { decode } = pkg;
 
 const main = async () => {
+  let privateKey: number[] = [];
+
+  if ( typeof PRIVATE_KEY === 'string' ) {
+    const decoded = decode(PRIVATE_KEY);
+    privateKey = Array.from(decoded);
+  } else {
+    privateKey = PRIVATE_KEY;
+  }
+
+  console.log(privateKey);
+
   let amm = new SerumAMM(
-    PAIRNAME, RPCURL, PRIVATE_KEY, MARKETADDRESS, PROGRAMADDRESS);
+    PAIRNAME, RPCURL, privateKey, MARKETADDRESS, PROGRAMADDRESS);
   await amm.serum.init();
   await amm.serum.fetchOrderBook();
 

@@ -3,6 +3,8 @@ import SerumAMM from './lib/SerumAMM';
 dotenv.config();
 import { PAIRNAME, RPCURL, PRIVATE_KEY, MARKETADDRESS, PROGRAMADDRESS } from './config/env';
 import Config, { IConfig } from './models/AMMConfig';
+import pkg from 'bs58';
+const { decode } = pkg;
 
 
 const defaultConfig = {
@@ -34,9 +36,19 @@ const defaultConfig = {
 } as IConfig;
 
 const run = async () => {
+  let privateKey: number[] = [];
+
+  if ( typeof PRIVATE_KEY === 'string' ) {
+    const decoded = decode(PRIVATE_KEY);
+    privateKey = Array.from(decoded);
+  } else {
+    privateKey = PRIVATE_KEY;
+  }
+ 
   let amm = new SerumAMM(
-    PAIRNAME, RPCURL, PRIVATE_KEY, MARKETADDRESS, PROGRAMADDRESS);
-  await amm.serum.init();
+    PAIRNAME, RPCURL, privateKey, MARKETADDRESS, PROGRAMADDRESS);
+ 
+    await amm.serum.init();
   await amm.serum.fetchOrderBook();
   
   const createConfig = async () => {
