@@ -16,8 +16,6 @@ const main = async () => {
     privateKey = PRIVATE_KEY;
   }
 
-  console.log(privateKey);
-
   let amm = new SerumAMM(
     PAIRNAME, RPCURL, privateKey, MARKETADDRESS, PROGRAMADDRESS);
   await amm.serum.init();

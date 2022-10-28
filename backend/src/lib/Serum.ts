@@ -46,7 +46,8 @@ class Serum {
       },
       "debug"
     );
-    this.log.info('Initialized')
+    let owner = new Account(this.secretKey);
+    this.log.info(`Initialized: ${owner.publicKey}`);
   }
 
   async init() {
