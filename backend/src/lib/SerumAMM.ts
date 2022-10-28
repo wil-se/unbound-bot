@@ -91,7 +91,7 @@ export default class SerumAMM {
                 let conf = await Config.find({ name: this.serum.dbName });
                 let c;
                 if (conf === undefined || conf == null || conf.length === 0) {
-                    console.log("creating config..");
+                    this.log.info("CREATING CONFIG");
                     c = new Config(defaultConfig);
                     c.name = this.serum.dbName;
                     c.save();
