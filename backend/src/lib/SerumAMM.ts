@@ -91,7 +91,6 @@ export default class SerumAMM {
                 let conf = await Config.find({ name: this.serum.dbName });
                 let c;
                 if (conf === undefined || conf == null || conf.length === 0) {
-                    this.log.info("CREATING CONFIG");
                     c = new Config(defaultConfig);
                     c.name = this.serum.dbName;
                     c.save();
@@ -254,7 +253,7 @@ export default class SerumAMM {
                 }
                 bids_sizes.push(size);
                 this.log.info(`buy ${price} ${amount}=${(size_bids as number[])[bid]}% ${amount * price} limit`);
-                // this.serum.placeOrder('buy', (price_bids as number[])[bid], (size_bids as number[])[bid]*bidAmount, 'limit');
+                this.serum.placeOrder('buy', (price_bids as number[])[bid], (size_bids as number[])[bid]*bidAmount, 'limit');
             }
             let bids_total = bids_sizes.reduce((total, current) => { return total + current });
             this.log.info(`sum of all bids sizes: ${bids_total}`);
@@ -271,7 +270,7 @@ export default class SerumAMM {
                 }
                 asks_sizes.push(size);
                 this.log.info(`sell ${price} ${amount}=${(size_asks as number[])[ask]}% ${parseFloat(price) * parseFloat(amount)} limit`);
-                // this.serum.placeOrder('sell', (price_asks as number[])[bid], (size_asks as number[])[bid]*askAmount, 'limit');
+                this.serum.placeOrder('sell', (price_asks as number[])[ask], (size_asks as number[])[ask]*askAmount, 'limit');
             }
             let asks_total = asks_sizes.reduce((total, current) => { return total + current });
             this.log.info(`sum of all ask sizes: ${asks_total}`);
