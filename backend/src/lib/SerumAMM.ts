@@ -168,6 +168,7 @@ export default class SerumAMM {
                 width *= 10;
                 order++;
             }
+            console.log(`PRICE: ${price}`);
             let threshold = this.config.threshold;
             let a = this.config.a;
             let b = this.config.b;
@@ -179,6 +180,8 @@ export default class SerumAMM {
             while (Math.pow(stretch, k) / width < width) {
                 let step = Math.pow(stretch, k) / width;
                 if (step > threshold) {
+                    console.log(`STEP: ${step}`);
+                    console.log(`FINAL PRICE: ${price - (step / Math.pow(10, order))}`)
                     price_bids.push(price - (step / Math.pow(10, order)));
                     size_bids.push(0);
                 }
@@ -197,6 +200,8 @@ export default class SerumAMM {
             while (Math.pow(stretch, k) / width < width) {
                 let step = Math.pow(stretch, k) / width;
                 if (step > threshold) {
+                    console.log(`STEP: ${step}`);
+                    console.log(`FINAL PRICE: ${price - (step / Math.pow(10, order))}`)
                     price_asks.push(price + (step / Math.pow(10, order)));
                     size_asks.push(0);
                 }
