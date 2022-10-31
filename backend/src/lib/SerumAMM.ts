@@ -425,23 +425,24 @@ export default class SerumAMM {
   async makeMarket() {
     try {
       let orders = await this.serum.getOrders();
-      this.log.info(`number of orders opened: ${orders.length}\norders:\n${orders}`);
+      this.log.info(`number of orders opened: ${orders.length}\norders:\n${orders.map(o => JSON.stringify(o) + '\n')}`);
       let priceDivergence = await this.priceDivergence()
       this.log.info(`price divergence: ${priceDivergence}`)
       if (
         Math.abs(priceDivergence) > this.config.maxPriceDivergence &&
         orders.length !== 0
       ) {
-        await this.serum.cancelAllOrders()
-        await this.serum.settleFunds()
+        this.log.info('price divergenge exceeded, closing positions');
+        await this.serum.cancelAllOrders();
+        await this.serum.settleFunds();
       }
-      if (priceDivergence <= this.config.maxPriceDivergence) {
-        if (((await this.sendOrders(true, true)) as number) !== orders.length) {
-          await this.serum.cancelAllOrders();
-          await this.serum.settleFunds();
-          this.log.info(`reset`);
-          await this.sendOrders();
-        }
+      if (((await this.sendOrders(true, true)) as number) !== orders.length && priceDivergence <= this.config.maxPriceDivergence) {
+        this.log.info('rebalancing positions');
+        await this.serum.cancelAllOrders();
+        await this.serum.settleFunds();
+        await this.sendOrders();
+      } else {
+        this.log.info(`skipping iteration`);
       }
     } catch (e) {
       this.log.info((e as Error).message)

@@ -178,7 +178,9 @@ class Serum {
           `${(e as Error).message
           }\nsize: ${size} side: ${side} price: ${price} type: ${orderType} retry left: ${maxRetries}`,
         )
-        return this.placeOrder(side, price, size, orderType, --maxRetries);
+        if ((e as Error).message.match('blockhash'))
+          return this.placeOrder(side, price, size, orderType, --maxRetries);
+        return 0;
       }
     }
     else return 0;
