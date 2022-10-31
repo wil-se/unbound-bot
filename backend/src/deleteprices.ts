@@ -24,6 +24,8 @@ const run = async () => {
 
   const createConfig = async () => {
     await PairPrice.deleteMany();
+    console.log('done');
+    process.exit();
   };
 
   createConfig();

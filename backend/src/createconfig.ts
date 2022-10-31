@@ -54,7 +54,9 @@ const run = async () => {
   const createConfig = async () => {
     let conf = new Config(defaultConfig);
     conf.name = PAIRNAME;
-    conf.save();
+    await conf.save();
+    console.log('done');
+    process.exit();
   };
 
   createConfig();

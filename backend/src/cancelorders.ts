@@ -22,13 +22,13 @@ const run = async () => {
   await amm.serum.init();
   await amm.serum.fetchOrderBook();
 
-  const createConfig = async () => {
-    await Config.deleteMany();
+  const cancelOrders = async () => {
+    await amm.serum.cancelAllOrders();
     console.log('done');
     process.exit();
   };
 
-  createConfig();
+  cancelOrders();
 }
 
 run();

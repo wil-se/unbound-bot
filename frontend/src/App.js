@@ -45,9 +45,9 @@ function App() {
         {/* <Row>
           <BidAMMConfig asks={asks} bids={bids} price={price} />
         </Row> */}
-        <Row>
+        {/* <Row>
           <BidAMMConfig2 asks={asks} bids={bids} price={price} />
-        </Row>
+        </Row> */}
         <Row>
           <FilledOrders marketAddress={marketAddress} programAddress={programAddress} />
         </Row>

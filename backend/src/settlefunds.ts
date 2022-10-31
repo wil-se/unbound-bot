@@ -22,13 +22,13 @@ const run = async () => {
   await amm.serum.init();
   await amm.serum.fetchOrderBook();
 
-  const createConfig = async () => {
-    await Config.deleteMany();
+  const settleFunds = async () => {
+    await amm.serum.settleFunds();
     console.log('done');
     process.exit();
   };
 
-  createConfig();
+  settleFunds();
 }
 
 run();
