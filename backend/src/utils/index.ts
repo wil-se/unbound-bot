@@ -27,5 +27,6 @@ async function getPairInfo(baseAddress: string, quoteAddress: string, reversed=t
 }
 
 export {
-    getPairInfo
+    getPairInfo,
+    packReturn
 }

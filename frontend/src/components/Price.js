@@ -12,7 +12,7 @@ export default function Price(props) {
     if (info.data.success) {
       props.setBaseSymbol(info.data.result.baseSymbol);
       props.setQuoteSymbol(info.data.result.quoteSymbol);
-      props.setPrice(info.data.result.price);
+      props.setPrice(info.data.result.reversedPrice);
     }
   }
 

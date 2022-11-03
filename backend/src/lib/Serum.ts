@@ -8,7 +8,7 @@ import Order, { IOrder } from '../models/Order'
 import { connect, disconnect } from 'mongoose'
 import { DB_CONN_STRING } from '../config/env'
 import * as Colors from '../config/colors';
-
+import { packReturn } from '../utils';
 
 function logToTransport(logObject: ILogObject) {
   appendFileSync(
@@ -59,7 +59,7 @@ class Serum {
       'debug',
     )
     let owner = new Account(this.secretKey)
-    this.log.info(`Initialized: ${owner.publicKey}`)
+    this.log.info(`Initialized, pubkey: ${owner.publicKey}`)
     this.log.info(
       `market: https://solscan.io/account/${this.marketAddressPubKey}\nprogram: https://solscan.io/account/${this.programAddressPubKey}`,
     )
@@ -80,6 +80,44 @@ class Serum {
       {},
       new PublicKey(this.programAddressPubKey),
     )
+  }
+
+  async getBids() {
+    try {
+      let market = await this.getMarket();
+      let bids = await market.loadBids(this.connection);
+      let result = [];
+      for (let order of bids) {
+        result.push({
+          'orderId': order.orderId,
+          'price': order.price,
+          'size': order.size,
+          'side': order.side
+        });
+      }
+      return packReturn(result, '', true, []);
+    } catch (e) {
+      return packReturn([], (e as Error).message);
+    }
+  }
+
+  async getAsks() {
+    try {
+      let market = await this.getMarket();
+      let asks = await market.loadAsks(this.connection);
+      let result = [];
+      for (let order of asks) {
+        result.push({
+          'orderId': order.orderId,
+          'price': order.price,
+          'size': order.size,
+          'side': order.side
+        });
+      }
+      return packReturn(result, '', true, []);
+    } catch (e) {
+      return packReturn([], (e as Error).message);
+    }
   }
 
   async fetchOrderBook() {
@@ -140,7 +178,7 @@ class Serum {
   ): Promise<any> {
     if (maxRetries > 0) {
       try {
-        price = parseFloat(price.toFixed(2));
+        price = parseFloat(price.toFixed(4));
         let market = await this.getMarket();
         let owner = new Account(this.secretKey);
         let payer: PublicKey;

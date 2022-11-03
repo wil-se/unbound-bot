@@ -18,7 +18,7 @@ export default function MarketSelector(props) {
               defaultValue=""
             />
             <Form.Text className={{ color: '#ffe4ea' }}>
-              SOL/USDC: 9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT
+              MBB/SOL: 2g3Fv1c1gWhWkzDxRSnRp3q2x7kvsF3HZDyXgpUFh58Q
             </Form.Text>
           </Col>
           <Col xs={6}>

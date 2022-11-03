@@ -16,7 +16,7 @@ def show_chart():
         with open(file_path, 'r') as file:
             data = json.load(file)
 
-        ax.plot([data['price'], data['price']], [0, 0.2], color="orange")
+        ax.plot([data['price'], data['price']], [0, data['size_bids'][len(data['size_bids'])-1]], color="orange")
         ax.stem(data['price_bids']+data['price_asks'], data['size_bids']+data['size_asks'],linefmt='k-',markerfmt='.')
 
         fig.canvas.flush_events()

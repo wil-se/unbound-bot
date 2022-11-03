@@ -49,7 +49,7 @@ app.get('/info', async (req: Request, res: Response) => {
     try {
         let baseAddress: string = req.query.baseAddress as string;
         let quoteAddress: string = req.query.quoteAddress as string;
-        let result = await getPairInfo(baseAddress, quoteAddress);
+        let result = await getPairInfo(baseAddress, quoteAddress, true);
         res.send(result);
     } catch (e) {
         console.log(e);

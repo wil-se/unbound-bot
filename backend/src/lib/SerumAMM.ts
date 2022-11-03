@@ -23,15 +23,17 @@ const defaultConfig = {
   // newest and oldest price is greater than maxPriceDivergence
   askPercentage: 50, // allocate askPercentage of the base token to asks
   bidPercentage: 50, // allocate askPercentage of the base token to bids
-  width: 10.0, // make bids between width-price < price < price+width
-  stretch: 1.1, // scale space between prices of the orders
-  threshold: 0.1, // price-width < -threshold < price < threshold < price+width
-  // there are no bids between threshold
-  // orders will be placed between (price-width and price-threshold)
-  // and between (price+threshold and price width)
-  a: 1.1, // parabola equation parameteres
-  b: 1.1, // ax^2+bx+c used to get the sizes of orders
-  c: 1.1, // the sum of the sizes of an ask or a bid list must be 1
+  width: 8, // make bids between width-price < price < price+width
+  density: 0.09, // scale space between prices of the orders
+  spread: 0.1, // price-width < -spread < price < spread < price+width
+  unit: 1,
+  decimals: 2,
+  // there are no bids between spread
+  // orders will be placed between (price-width and price-spread)
+  // and between (price+spread and price width)
+  a: 0.1, // parabola equation parameteres
+  b: 10, // ax^2+bx+c used to get the sizes of orders
+  c: 1, // the sum of the sizes of an ask or a bid list must be 1
   // so it can be proportioned with askPercentage and bidPercentage
 
   // run python3 charts/orders.py to display the amm config visually
@@ -88,8 +90,9 @@ export default class SerumAMM {
     priceCheckInterval: number,
     priceCheckIntervalDelta: number,
     width: number,
-    stretch: number,
-    threshold: number,
+    density: number,
+    spread: number,
+    unit: number,
     a: number,
     b: number,
     c: number,
@@ -100,8 +103,9 @@ export default class SerumAMM {
         conf.priceCheckInterval = priceCheckInterval
         conf.priceCheckIntervalDelta = priceCheckIntervalDelta
         conf.width = width
-        conf.stretch = stretch
-        conf.threshold = threshold
+        conf.density = density
+        conf.spread = spread
+        conf.unit = unit
         conf.a = a
         conf.b = b
         conf.c = c
@@ -117,14 +121,15 @@ export default class SerumAMM {
       if (id !== undefined) {
         return (await Config.findById(id)) as IConfig
       } else {
-        let conf = await Config.find({ name: this.serum.dbName })
-        let c
+        let conf = await Config.find({ name: this.serum.dbName });
+        let c;
         if (conf === undefined || conf == null || conf.length === 0) {
           c = new Config(defaultConfig)
           c.name = this.serum.dbName
           c.save()
+          return c;
         }
-        return conf !== undefined ? conf[0] : c
+        return conf[0];
       }
     } catch (e) {
       this.log.info((e as Error).message)
@@ -133,15 +138,15 @@ export default class SerumAMM {
 
   async updateConfig(id?: string) {
     try {
-      let conf: IConfig | undefined = await this.getConfig(
-        id === undefined ? undefined : id,
-      )
+      let conf: IConfig | undefined = await this.getConfig(id);
       if (conf !== undefined) {
         this.config.priceCheckInterval = conf.priceCheckInterval
         this.config.priceCheckIntervalDelta = conf.priceCheckIntervalDelta
         this.config.width = conf.width
-        this.config.stretch = conf.stretch
-        this.config.threshold = conf.threshold
+        this.config.density = conf.density
+        this.config.spread = conf.spread
+        this.config.unit = conf.unit
+        this.config.decimals = conf.decimals
         this.config.a = conf.a
         this.config.b = conf.b
         this.config.c = conf.c
@@ -197,14 +202,14 @@ export default class SerumAMM {
     try {
       let prices: IPairPrice[] = await PairPrice.find().sort('timestamp')
       let price = prices[prices.length - 1].price
-      let stretch = this.config.stretch
+      let density = this.config.density
       let width = this.config.width
       let order = 0
       while (width <= 1) {
         width *= 10
         order++
       }
-      let threshold = this.config.threshold
+      let spread = this.config.spread
       let a = this.config.a
       let b = this.config.b
       let c = this.config.c
@@ -212,9 +217,9 @@ export default class SerumAMM {
       let price_bids = []
       let size_bids = []
       let k = 0
-      while (Math.pow(stretch, k) / width < width) {
-        let step = Math.pow(stretch, k) / width
-        if (step > threshold) {
+      while (Math.pow(density, k) / width < width) {
+        let step = Math.pow(density, k) / width;
+        if (step > spread) {
           price_bids.push(price - step / Math.pow(10, order))
           size_bids.push(0)
         }
@@ -231,9 +236,9 @@ export default class SerumAMM {
       let price_asks = []
       let size_asks = []
       k = 0
-      while (Math.pow(stretch, k) / width < width) {
-        let step = Math.pow(stretch, k) / width
-        if (step > threshold) {
+      while (Math.pow(density, k) / width < width) {
+        let step = Math.pow(density, k) / width;
+        if (step > spread) {
           price_asks.push(price + step / Math.pow(10, order))
           size_asks.push(0)
         }
@@ -268,6 +273,80 @@ export default class SerumAMM {
     }
   }
 
+  fibo(density: number, current: number, previous: number, mx: number, result: number[]): number[] {
+    let next = current + (previous * density);
+    if (next > mx)
+      return result;
+    result.push(next);
+    return this.fibo(density, next, current, mx, result);
+  }
+
+  async buildOrdersV2() {
+    try {
+      await this.updateConfig();
+      let density = this.config.density;
+      let width = this.config.width;
+      let unit = this.config.unit as number;
+      let decimals = this.config.decimals;
+      let a = this.config.a;
+      let b = this.config.b;
+      let c = this.config.c;
+      let serie: number[] = this.fibo(density, unit, unit, width, []);
+      let prices: IPairPrice[] = await PairPrice.find().sort('timestamp');
+      let price = parseFloat(prices[0].price.toFixed(decimals));
+
+      let bid_prices: number[] = [];
+      let bid_sizes: number[] = [];
+      let ask_prices: number[] = [];
+      let ask_sizes: number[] = [];
+
+      serie.map(x => {
+        let ask = parseFloat((price + x - unit).toFixed(decimals));
+        let bid = parseFloat((price - x + unit).toFixed(decimals));
+        if (!bid_prices.includes(bid)
+          && !ask_prices.includes(ask)
+          && ask !== price
+          && bid !== price
+          && ask > 0 && bid > 0
+          && ask - price > this.config.spread) {
+          ask_sizes.push((Math.pow(x, 2) * a) + (x * b) + c);
+          ask_prices.push(ask);
+          bid_sizes.push((Math.pow(x, 2) * a) + (x * b) + c);
+          bid_prices.push(bid);
+        }
+      });
+
+
+      let bids_size_sum = bid_sizes.reduce((total, current) => { return total + current });
+      let asks_size_sum = ask_sizes.reduce((total, current) => { return total + current });
+
+      bid_sizes = bid_sizes.map(s => Math.floor((s / bids_size_sum) * 100));
+      ask_sizes = ask_sizes.map(s => Math.floor((s / asks_size_sum) * 100));
+      bid_sizes[bid_sizes.length - 1] = bid_sizes[bid_sizes.length - 1] + 100 - bid_sizes.reduce((total, current) => { return total + current })
+      ask_sizes[ask_sizes.length - 1] = ask_sizes[ask_sizes.length - 1] + 100 - ask_sizes.reduce((total, current) => { return total + current })
+
+      let data = {
+        price_bids: bid_prices,
+        size_bids: bid_sizes,
+        price_asks: ask_prices,
+        size_asks: ask_sizes,
+        price: price,
+      }
+
+      FileSystem.writeFileSync(
+        'src/temp/orders.json',
+        JSON.stringify(data),
+        (err: any) => {
+          if (err) throw err
+        },
+      );
+      return [bid_prices, bid_sizes, ask_prices, ask_sizes, price];
+    } catch (e) {
+      this.log.info((e as Error).message)
+      return [[], [], [], []]
+    }
+  }
+
   buildHeightBar(index: number, len: number) {
     let s = '['
     for (let i = 0; i < index; i++) {
@@ -280,7 +359,7 @@ export default class SerumAMM {
     return s
   }
 
-  async sendOrders(paper = false, silent = false) {
+  async sendOrders(paper = false) {
     let sent = 0
     try {
       let askPercentage = this.config.askPercentage
@@ -299,11 +378,10 @@ export default class SerumAMM {
       let askAmount = (askPercentage * amount) / 100;
       let bidAmount = (bidPercentage * amount) / 100;
 
-      !silent && this.log.info('sending orders');
-      !silent &&
-        this.log.info(`total ${this.serum.baseMintAddress} amount: ${amount}`);
-      !silent && this.log.info(`allocated ask amount: ${askAmount}`);
-      !silent && this.log.info(`allocated bid amount: ${bidAmount}`);
+      this.log.info('sending orders');
+      this.log.info(`total ${this.serum.baseMintAddress} amount: ${amount}`);
+      this.log.info(`allocated ask amount: ${askAmount}`);
+      this.log.info(`allocated bid amount: ${bidAmount}`);
 
       let [
         price_bids,
@@ -311,49 +389,25 @@ export default class SerumAMM {
         price_asks,
         size_asks,
         price,
-      ] = await this.buildOrders();
+      ] = await this.buildOrdersV2();
+
       let bids_sizes = [];
-      for (let bid = 0; bid < (price_bids as number[]).length; bid++) {
+      for (let bid = (price_bids as number[]).length - 1; bid >= 0; bid--) {
         let price = parseFloat((price_bids as number[])[bid].toFixed(8))
-        let amount =
-          parseFloat(((size_bids as number[])[bid] * bidAmount).toFixed(0)) + 1
-        let bids_total =
-          bids_sizes.length === 0
-            ? 0
-            : bids_sizes.reduce((total, current) => {
-              return total + current
-            })
-        let size =
-          parseFloat(((size_bids as number[])[bid] * bidAmount).toFixed(0)) + 1
-        !silent &&
+        let size = Math.floor((size_bids as number[])[bid] * bidAmount / 100)
           this.log.info(
             `${Colors.FgGreen
-            }buy price: ${price} amount: ${amount}=${(size_bids as number[])[
-              bid
-            ].toFixed(4)}% ${(amount * price).toFixed(
+            }buy price: ${price} size: ${size} ${(amount * price).toFixed(
               4,
             )} limit\n${this.buildHeightBar(size, bidAmount)}${Colors.Reset}`,
           )
-        if (bids_total + size >= bidAmount) {
-          size = bidAmount - bids_total;
-          bids_sizes.push(size)
-          await new Promise((resolve) => setTimeout(resolve, 300))
-          !paper &&
-            this.serum.placeOrder(
-              'buy',
-              (price_bids as number[])[bid],
-              size,
-              'limit',
-            )
-          sent++
-          break
-        }
+
         bids_sizes.push(size)
         await new Promise((resolve) => setTimeout(resolve, 300))
         !paper &&
           this.serum.placeOrder(
             'buy',
-            (price_bids as number[])[bid],
+            price,
             size,
             'limit',
           )
@@ -362,49 +416,24 @@ export default class SerumAMM {
       let bids_total = bids_sizes.reduce((total, current) => {
         return total + current
       })
-      !silent && this.log.info(`price ${price}`)
+      this.log.info(`price ${price}`)
       let asks_sizes = []
       for (let ask = 0; ask < (price_asks as number[]).length; ask++) {
         let price = parseFloat((price_asks as number[])[ask].toFixed(8))
-        let amount =
-          parseFloat(((size_asks as number[])[ask] * askAmount).toFixed(0)) + 1
-        let asks_total =
-          asks_sizes.length === 0
-            ? 0
-            : asks_sizes.reduce((total, current) => {
-              return total + current
-            })
-        let size =
-          parseFloat(((size_asks as number[])[ask] * askAmount).toFixed(0)) + 1
-        !silent &&
-          this.log.info(
-            `${Colors.FgRed
-            }sell price: ${price} amount: ${amount}=${(size_asks as number[])[
-              ask
-            ].toFixed(4)}% ${(price * amount).toFixed(
-              4,
-            )} limit\n${this.buildHeightBar(size, askAmount)}${Colors.Reset}`,
-          )
-        if (asks_total + size >= askAmount) {
-          size = askAmount - asks_total
-          asks_sizes.push(size)
-          await new Promise((resolve) => setTimeout(resolve, 300))
-          !paper &&
-            this.serum.placeOrder(
-              'sell',
-              (price_asks as number[])[ask],
-              size,
-              'limit',
-            )
-          sent++
-          break
-        }
+        let size = Math.floor((size_asks as number[])[ask] * askAmount / 100);
+        this.log.info(
+          `${Colors.FgRed
+          }sell price: ${price} size: ${size} ${(price * amount).toFixed(
+            4,
+          )} limit\n${this.buildHeightBar(size, askAmount)}${Colors.Reset}`,
+        )
+
         asks_sizes.push(size)
         await new Promise((resolve) => setTimeout(resolve, 300))
         !paper &&
           this.serum.placeOrder(
             'sell',
-            (price_asks as number[])[ask],
+            price,
             size,
             'limit',
           )
@@ -413,11 +442,11 @@ export default class SerumAMM {
       let asks_total = asks_sizes.reduce((total, current) => {
         return total + current
       })
-      !silent && this.log.info(`sum of all bids sizes: ${bids_total}`)
-      !silent && this.log.info(`sum of all ask sizes: ${asks_total}`)
+      this.log.info(`sum of all bids sizes: ${bids_total}`)
+      this.log.info(`sum of all ask sizes: ${asks_total}`)
       return sent
     } catch (e) {
-      !silent && this.log.info((e as Error).message)
+      this.log.info((e as Error).message)
       return sent
     }
   }
@@ -426,7 +455,11 @@ export default class SerumAMM {
     try {
       let orders = await this.serum.getOrders();
       this.log.info(`number of orders opened: ${orders.length}\norders:\n${orders.map(o => JSON.stringify(o) + '\n')}`);
-      let priceDivergence = await this.priceDivergence()
+      let priceDivergence = await this.priceDivergence();
+      let ordersExpected = await this.buildOrdersV2();
+      let ordersExpectedNumber = (ordersExpected[0] as number[]).length + (ordersExpected[2] as number[]).length;
+      this.log.info(`number of orders expected: ${ordersExpectedNumber}`);
+
       this.log.info(`price divergence: ${priceDivergence}`)
       if (
         Math.abs(priceDivergence) > this.config.maxPriceDivergence &&
@@ -436,11 +469,11 @@ export default class SerumAMM {
         await this.serum.cancelAllOrders();
         await this.serum.settleFunds();
       }
-      if (((await this.sendOrders(true, true)) as number) !== orders.length && priceDivergence <= this.config.maxPriceDivergence) {
+      if (ordersExpectedNumber !== orders.length && priceDivergence <= this.config.maxPriceDivergence) {
         this.log.info('rebalancing positions');
         await this.serum.cancelAllOrders();
         await this.serum.settleFunds();
-        await this.sendOrders();
+        await this.sendOrders(this.paper);
       } else {
         this.log.info(`skipping iteration`);
       }

@@ -12,10 +12,10 @@ export default function BidAskMaker(props) {
   const [askOrderType, setAskOrderType] = useState('limit');
 
   const handlePlaceAskOrder = async () => {
-    await placeOrder(props.marketAddress, props.programAddress, 'buy', askPrice, askSize, askOrderType);
+    await placeOrder(props.marketAddress, props.programAddress, 'sell', askPrice, askSize, askOrderType);
   }
   const handlePlaceBidOrder = async () => {
-    await placeOrder(props.marketAddress, props.programAddress, 'sell', bidPrice, bidSize, bidOrderType);
+    await placeOrder(props.marketAddress, props.programAddress, 'buy', bidPrice, bidSize, bidOrderType);
   }
 
   return (

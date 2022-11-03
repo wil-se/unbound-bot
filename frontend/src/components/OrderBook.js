@@ -47,8 +47,8 @@ export default function OrderBook(props) {
                   props.bids.map((a, index) => {
                     return <tr key={String(a.orderId)}>
                       <td>{a.orderId}</td>
-                      <td>{(parseFloat(a.price) * parseFloat(a.size)).toFixed(4)}</td>
-                      <td>{a.price.toFixed(4)}</td>
+                      <td>{(parseFloat(a.price) * parseFloat(a.size)).toFixed(6)}</td>
+                      <td>{a.price.toFixed(6)}</td>
                       <td>{a.size}</td>
                       <td>{a.side}</td>
                     </tr>
@@ -73,8 +73,8 @@ export default function OrderBook(props) {
                   props.asks.map((a, index) => {
                     return <tr key={String(a.orderId)} >
                       <td>{a.orderId}</td>
-                      <td>{(parseFloat(a.price) * parseFloat(a.size)).toFixed(4)}</td>
-                      <td>{a.price.toFixed(4)}</td>
+                      <td>{(parseFloat(a.price) * parseFloat(a.size)).toFixed(6)}</td>
+                      <td>{a.price.toFixed(6)}</td>
                       <td>{a.size}</td>
                       <td>{a.side}</td>
                     </tr>

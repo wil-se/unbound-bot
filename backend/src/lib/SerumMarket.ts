@@ -109,13 +109,14 @@ class SerumMarket implements ISerumMarket {
             let market = await this.getMarket();
             let owner = new Account(this.secretKey);
             let payer: PublicKey;
-            if (side === 'sell') {
-                payer = new PublicKey(owner.publicKey);
-            } else {
-                let associatedToken = await getOrCreateAssociatedTokenAccount(this.connection, owner, market.quoteMintAddress, owner.publicKey);
-                payer = new PublicKey(associatedToken.address);
-            }
-            let tx = await market.placeOrder(this.connection, {
+            let associatedToken = await getOrCreateAssociatedTokenAccount(
+                this.connection,
+                owner,
+                side === 'sell' ? market.baseMintAddress : market.quoteMintAddress,
+                owner.publicKey,
+              );
+              payer = new PublicKey(associatedToken.address);
+              let tx = await market.placeOrder(this.connection, {
                 owner,
                 payer,
                 side: side,
@@ -123,8 +124,11 @@ class SerumMarket implements ISerumMarket {
                 size: size,
                 orderType: orderType,
             });
+            console.log(tx);
+            console.log(`Order sent [${side}][${price}][${size}][${orderType}], tx: https://solscan.io/tx/${tx}`);
             return this.packReturn(true, '', true, [tx]);
         } catch (e) {
+            console.log(e);
             return this.packReturn(false, (e as Error).message);
         }
     }
