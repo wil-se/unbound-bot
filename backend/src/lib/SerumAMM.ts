@@ -8,6 +8,7 @@ import { PublicKey, Account } from '@solana/web3.js'
 import { getAssociatedTokenAddress } from '@solana/spl-token'
 const FileSystem = require('fs')
 import * as Colors from '../config/colors'
+import { timingSafeEqual } from 'crypto'
 
 const defaultConfig = {
   priceCheckInterval: 1000, // check price every priceCheckIntervalms
@@ -91,6 +92,8 @@ export default class SerumAMM {
     width: number,
     density: number,
     spread: number,
+    askPercentage: number,
+    bidPercentage: number,
     a: number,
     b: number,
     c: number,
@@ -103,6 +106,8 @@ export default class SerumAMM {
         conf.width = width
         conf.density = density
         conf.spread = spread
+        conf.askPercentage = askPercentage
+        conf.bidPercentage = bidPercentage
         conf.a = a
         conf.b = b
         conf.c = c
@@ -143,6 +148,8 @@ export default class SerumAMM {
         this.config.density = conf.density
         this.config.spread = conf.spread
         this.config.decimals = conf.decimals
+        this.config.askPercentage = conf.askPercentage
+        this.config.bidPercentage = conf.bidPercentage
         this.config.a = conf.a
         this.config.b = conf.b
         this.config.c = conf.c
@@ -295,7 +302,7 @@ export default class SerumAMM {
         unit *= 0.1;
       }
       console.log(`unit: ${unit}`)
-      let serie: number[] = this.fibo(density, unit, unit, price+width, []);
+      let serie: number[] = this.fibo(density, unit, unit, price + width, []);
 
       let bid_prices: number[] = [];
       let bid_sizes: number[] = [];
@@ -326,11 +333,11 @@ export default class SerumAMM {
       ask_sizes = ask_sizes.map(s => (s / asks_size_sum));
       // bid_sizes[bid_sizes.length - 1] = bid_sizes[bid_sizes.length - 1] + 100 - bid_sizes.reduce((total, current) => { return total + current })
       // ask_sizes[ask_sizes.length - 1] = ask_sizes[ask_sizes.length - 1] + 100 - ask_sizes.reduce((total, current) => { return total + current })
-      console.log(bid_sizes);      
+      console.log(bid_sizes);
       console.log(ask_sizes);
       console.log(`bid_sizes: ${bid_sizes.reduce((total, current) => { return total + current })}`);
       console.log(`ask_sizes: ${ask_sizes.reduce((total, current) => { return total + current })}`);
-      
+
 
       let data = {
         price_bids: bid_prices,
@@ -385,10 +392,12 @@ export default class SerumAMM {
       let askAmount = (askPercentage * amount) / 100;
       let bidAmount = (bidPercentage * amount) / 100;
 
+      console.log(`askPercentage: ${askPercentage}`);
+      console.log(`bidPercentage: ${bidPercentage}`);
       this.log.info('sending orders');
       this.log.info(`total ${this.serum.baseMintAddress} amount: ${amount}`);
-      this.log.info(`allocated ask amount: ${askAmount}`);
-      this.log.info(`allocated bid amount: ${bidAmount}`);
+      this.log.info(`ask amount: ${askAmount}`);
+      this.log.info(`bid amount: ${bidAmount}`);
 
       let [
         price_bids,
@@ -397,17 +406,21 @@ export default class SerumAMM {
         size_asks,
         price,
       ] = await this.buildOrdersV2();
-
+      
+      size_bids = size_bids as number[];
+      size_asks = size_asks as number[];
+      
       let bids_sizes = [];
       for (let bid = (price_bids as number[]).length - 1; bid >= 0; bid--) {
-        let price = parseFloat((price_bids as number[])[bid].toFixed(8))
-        let size = Math.floor((size_bids as number[])[bid] * bidAmount)
-          this.log.info(
-            `${Colors.FgGreen
-            }buy price: ${price} size: ${size} ${(amount * price).toFixed(
-              4,
-            )} limit\n${this.buildHeightBar(size, bidAmount)}${Colors.Reset}`,
-          )
+        let price = parseFloat((price_bids as number[])[bid].toFixed(8));
+        console.log(size_bids[bid]);
+        console.log(bidAmount);
+        console.log(price);
+        let size = Math.floor((size_bids[bid] * bidAmount) / price);
+        this.log.info(
+          `${Colors.FgGreen
+          }buy price: ${price} size: ${size} total: ${price * size} limit\n${this.buildHeightBar(size, bidAmount)}${Colors.Reset}`,
+        )
 
         bids_sizes.push(size)
         await new Promise((resolve) => setTimeout(resolve, 300))
@@ -420,19 +433,14 @@ export default class SerumAMM {
           )
         sent++
       }
-      let bids_total = bids_sizes.reduce((total, current) => {
-        return total + current
-      })
       this.log.info(`price ${price}`)
       let asks_sizes = []
       for (let ask = 0; ask < (price_asks as number[]).length; ask++) {
         let price = parseFloat((price_asks as number[])[ask].toFixed(8))
-        let size = Math.floor((size_asks as number[])[ask] * askAmount);
+        let size = Math.floor((size_asks[ask] * askAmount) / price);
         this.log.info(
           `${Colors.FgRed
-          }sell price: ${price} size: ${size} ${(price * amount).toFixed(
-            4,
-          )} limit\n${this.buildHeightBar(size, askAmount)}${Colors.Reset}`,
+          }sell price: ${price} size: ${size} total: ${price * size} limit\n${this.buildHeightBar(size, askAmount)}${Colors.Reset}`,
         )
 
         asks_sizes.push(size)
@@ -446,11 +454,15 @@ export default class SerumAMM {
           )
         sent++
       }
-      let asks_total = asks_sizes.reduce((total, current) => {
-        return total + current
-      })
-      this.log.info(`sum of all bids sizes: ${bids_total}`)
-      this.log.info(`sum of all ask sizes: ${asks_total}`)
+
+      let bidSum = 0;
+      let askSum = 0;
+      for(let i=0; i<bids_sizes.length; i++) {
+        bidSum += bids_sizes[i] * (price as number);
+        askSum += asks_sizes[i] * (price as number);
+      }
+      console.log(`total bid sum: ${bidSum}`);      
+      console.log(`total ask sum: ${askSum}`);
       return sent
     } catch (e) {
       this.log.info((e as Error).message)
@@ -477,7 +489,6 @@ export default class SerumAMM {
         await this.serum.settleFunds();
       }
       if (ordersExpectedNumber !== orders.length && priceDivergence <= this.config.maxPriceDivergence) {
-        this.log.info('rebalancing positions');
         await this.serum.cancelAllOrders();
         await this.serum.settleFunds();
         await this.sendOrders(this.paper);
