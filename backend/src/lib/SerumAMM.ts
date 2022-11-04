@@ -26,7 +26,6 @@ const defaultConfig = {
   width: 8, // make bids between width-price < price < price+width
   density: 0.09, // scale space between prices of the orders
   spread: 0.1, // price-width < -spread < price < spread < price+width
-  unit: 1,
   decimals: 2,
   // there are no bids between spread
   // orders will be placed between (price-width and price-spread)
@@ -92,7 +91,6 @@ export default class SerumAMM {
     width: number,
     density: number,
     spread: number,
-    unit: number,
     a: number,
     b: number,
     c: number,
@@ -105,7 +103,6 @@ export default class SerumAMM {
         conf.width = width
         conf.density = density
         conf.spread = spread
-        conf.unit = unit
         conf.a = a
         conf.b = b
         conf.c = c
@@ -145,7 +142,6 @@ export default class SerumAMM {
         this.config.width = conf.width
         this.config.density = conf.density
         this.config.spread = conf.spread
-        this.config.unit = conf.unit
         this.config.decimals = conf.decimals
         this.config.a = conf.a
         this.config.b = conf.b
@@ -286,14 +282,20 @@ export default class SerumAMM {
       await this.updateConfig();
       let density = this.config.density;
       let width = this.config.width;
-      let unit = this.config.unit as number;
       let decimals = this.config.decimals;
       let a = this.config.a;
       let b = this.config.b;
       let c = this.config.c;
-      let serie: number[] = this.fibo(density, unit, unit, width, []);
       let prices: IPairPrice[] = await PairPrice.find().sort('timestamp');
       let price = parseFloat(prices[0].price.toFixed(decimals));
+      let unit = 1;
+      let tPrice = price;
+      while (tPrice < 1) {
+        tPrice *= 10
+        unit *= 0.1;
+      }
+      console.log(`unit: ${unit}`)
+      let serie: number[] = this.fibo(density, unit, unit, price+width, []);
 
       let bid_prices: number[] = [];
       let bid_sizes: number[] = [];
@@ -320,10 +322,15 @@ export default class SerumAMM {
       let bids_size_sum = bid_sizes.reduce((total, current) => { return total + current });
       let asks_size_sum = ask_sizes.reduce((total, current) => { return total + current });
 
-      bid_sizes = bid_sizes.map(s => Math.floor((s / bids_size_sum) * 100));
-      ask_sizes = ask_sizes.map(s => Math.floor((s / asks_size_sum) * 100));
-      bid_sizes[bid_sizes.length - 1] = bid_sizes[bid_sizes.length - 1] + 100 - bid_sizes.reduce((total, current) => { return total + current })
-      ask_sizes[ask_sizes.length - 1] = ask_sizes[ask_sizes.length - 1] + 100 - ask_sizes.reduce((total, current) => { return total + current })
+      bid_sizes = bid_sizes.map(s => (s / bids_size_sum));
+      ask_sizes = ask_sizes.map(s => (s / asks_size_sum));
+      // bid_sizes[bid_sizes.length - 1] = bid_sizes[bid_sizes.length - 1] + 100 - bid_sizes.reduce((total, current) => { return total + current })
+      // ask_sizes[ask_sizes.length - 1] = ask_sizes[ask_sizes.length - 1] + 100 - ask_sizes.reduce((total, current) => { return total + current })
+      console.log(bid_sizes);      
+      console.log(ask_sizes);
+      console.log(`bid_sizes: ${bid_sizes.reduce((total, current) => { return total + current })}`);
+      console.log(`ask_sizes: ${ask_sizes.reduce((total, current) => { return total + current })}`);
+      
 
       let data = {
         price_bids: bid_prices,
@@ -394,7 +401,7 @@ export default class SerumAMM {
       let bids_sizes = [];
       for (let bid = (price_bids as number[]).length - 1; bid >= 0; bid--) {
         let price = parseFloat((price_bids as number[])[bid].toFixed(8))
-        let size = Math.floor((size_bids as number[])[bid] * bidAmount / 100)
+        let size = Math.floor((size_bids as number[])[bid] * bidAmount)
           this.log.info(
             `${Colors.FgGreen
             }buy price: ${price} size: ${size} ${(amount * price).toFixed(
@@ -420,7 +427,7 @@ export default class SerumAMM {
       let asks_sizes = []
       for (let ask = 0; ask < (price_asks as number[]).length; ask++) {
         let price = parseFloat((price_asks as number[])[ask].toFixed(8))
-        let size = Math.floor((size_asks as number[])[ask] * askAmount / 100);
+        let size = Math.floor((size_asks as number[])[ask] * askAmount);
         this.log.info(
           `${Colors.FgRed
           }sell price: ${price} size: ${size} ${(price * amount).toFixed(
