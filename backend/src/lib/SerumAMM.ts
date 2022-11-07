@@ -283,6 +283,7 @@ export default class SerumAMM {
     result.push(next);
     return this.fibo(density, next, current, mx, result);
   }
+  
 
   async buildOrdersV2() {
     try {
@@ -294,15 +295,15 @@ export default class SerumAMM {
       let b = this.config.b;
       let c = this.config.c;
       let prices: IPairPrice[] = await PairPrice.find().sort('timestamp');
-      let price = parseFloat(prices[0].price.toFixed(decimals));
+      const dec = Math.pow(10, decimals);
+      let price = Math.trunc(prices[0].price*dec)/dec;
       let unit = 1;
       let tPrice = price;
       while (tPrice < 1) {
         tPrice *= 10
         unit *= 0.1;
       }
-      console.log(`unit: ${unit}`)
-      let serie: number[] = this.fibo(density, unit, unit, price + width, []);
+      let serie: number[] = this.fibo(density, unit, unit, price+width, []);
 
       let bid_prices: number[] = [];
       let bid_sizes: number[] = [];
@@ -333,11 +334,6 @@ export default class SerumAMM {
       ask_sizes = ask_sizes.map(s => (s / asks_size_sum));
       // bid_sizes[bid_sizes.length - 1] = bid_sizes[bid_sizes.length - 1] + 100 - bid_sizes.reduce((total, current) => { return total + current })
       // ask_sizes[ask_sizes.length - 1] = ask_sizes[ask_sizes.length - 1] + 100 - ask_sizes.reduce((total, current) => { return total + current })
-      console.log(bid_sizes);
-      console.log(ask_sizes);
-      console.log(`bid_sizes: ${bid_sizes.reduce((total, current) => { return total + current })}`);
-      console.log(`ask_sizes: ${ask_sizes.reduce((total, current) => { return total + current })}`);
-
 
       let data = {
         price_bids: bid_prices,
