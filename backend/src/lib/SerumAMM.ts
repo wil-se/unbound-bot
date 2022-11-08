@@ -277,7 +277,6 @@ export default class SerumAMM {
     return this.fibo(density, next, current, mx, result);
   }
   
-
   async buildOrdersV2() {
     try {
       await this.updateConfig();
@@ -469,13 +468,13 @@ export default class SerumAMM {
         orders.length !== 0
       ) {
         this.log.info('price divergenge exceeded, closing positions');
-        await this.serum.cancelAllOrders();
-        await this.serum.settleFunds();
+        !this.paper && await this.serum.cancelAllOrders();
+        !this.paper && await this.serum.settleFunds();
       }
       if (ordersExpectedNumber !== orders.length && priceDivergence <= this.config.maxPriceDivergence) {
         this.log.info('rebalancing positions');
-        await this.serum.cancelAllOrders();
-        await this.serum.settleFunds();
+        !this.paper && await this.serum.cancelAllOrders();
+        !this.paper && await this.serum.settleFunds();
         await this.sendOrders(this.paper);
       } else {
         this.log.info(`skipping iteration`);

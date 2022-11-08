@@ -1,8 +1,8 @@
 import dotenv from 'dotenv';
-import SerumAMM from './lib/SerumAMM';
+import SerumAMM from '../lib/SerumAMM';
 dotenv.config();
-import { PAIRNAME, RPCURL, PRIVATE_KEY, MARKETADDRESS, PROGRAMADDRESS } from './config/env';
-import Config, { IConfig } from './models/AMMConfig';
+import { PAIRNAME, RPCURL, PRIVATE_KEY, MARKETADDRESS, PROGRAMADDRESS } from '../config/env';
+import Config, { IConfig } from '../models/AMMConfig';
 import pkg from 'bs58';
 const { decode } = pkg;
 
@@ -21,10 +21,9 @@ const defaultConfig = {
   // newest and oldest price is greater than maxPriceDivergence
   askPercentage: 50, // allocate askPercentage of the base token to asks
   bidPercentage: 50, // allocate askPercentage of the base token to bids
-  width: 0.02, // make bids between width-price < price < price+width
-  density: 0.05, // scale space between prices of the orders
-  spread: 0.0, // price-width < -spread < price < spread < price+width
-  unit: 0.01,
+  width: 8, // make bids between width-price < price < price+width
+  density: 0.09, // scale space between prices of the orders
+  spread: 0.1, // price-width < -spread < price < spread < price+width
   decimals: 2,
   // there are no bids between spread
   // orders will be placed between (price-width and price-spread)
@@ -36,6 +35,7 @@ const defaultConfig = {
 
   // run python3 charts/orders.py to display the amm config visually
 } as IConfig
+
 
 const run = async () => {
   let privateKey: number[] = [];

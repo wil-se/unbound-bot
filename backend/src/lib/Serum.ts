@@ -82,44 +82,6 @@ class Serum {
     )
   }
 
-  async getBids() {
-    try {
-      let market = await this.getMarket();
-      let bids = await market.loadBids(this.connection);
-      let result = [];
-      for (let order of bids) {
-        result.push({
-          'orderId': order.orderId,
-          'price': order.price,
-          'size': order.size,
-          'side': order.side
-        });
-      }
-      return packReturn(result, '', true, []);
-    } catch (e) {
-      return packReturn([], (e as Error).message);
-    }
-  }
-
-  async getAsks() {
-    try {
-      let market = await this.getMarket();
-      let asks = await market.loadAsks(this.connection);
-      let result = [];
-      for (let order of asks) {
-        result.push({
-          'orderId': order.orderId,
-          'price': order.price,
-          'size': order.size,
-          'side': order.side
-        });
-      }
-      return packReturn(result, '', true, []);
-    } catch (e) {
-      return packReturn([], (e as Error).message);
-    }
-  }
-
   async fetchOrderBook() {
     try {
       let market = await this.getMarket()

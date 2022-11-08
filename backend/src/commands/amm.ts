@@ -1,8 +1,8 @@
 import dotenv from 'dotenv';
-import SerumAMM from './lib/SerumAMM';
+import SerumAMM from '../lib/SerumAMM';
 dotenv.config();
-import { PRIVATE_KEY, RPCURL, MARKETADDRESS, PROGRAMADDRESS, PAIRNAME, MAKEMARKETINTERVAL } from './config/env';
-import Config, { IConfig } from './models/AMMConfig';
+import { PRIVATE_KEY, RPCURL, MARKETADDRESS, PROGRAMADDRESS, PAIRNAME, MAKEMARKETINTERVAL } from '../config/env';
+import Config, { IConfig } from '../models/AMMConfig';
 import pkg from 'bs58';
 const { decode } = pkg;
 

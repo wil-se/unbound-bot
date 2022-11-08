@@ -1,8 +1,8 @@
 import dotenv from 'dotenv';
-import SerumAMM from './lib/SerumAMM';
+import SerumAMM from '../lib/SerumAMM';
 dotenv.config();
-import { PAIRNAME, RPCURL, PRIVATE_KEY, MARKETADDRESS, PROGRAMADDRESS } from './config/env';
-import Config, { IConfig } from './models/AMMConfig';
+import { PAIRNAME, RPCURL, PRIVATE_KEY, MARKETADDRESS, PROGRAMADDRESS } from '../config/env';
+import Config, { IConfig } from '../models/AMMConfig';
 import pkg from 'bs58';
 const { decode } = pkg;
 
@@ -22,13 +22,13 @@ const run = async () => {
   await amm.serum.init();
   await amm.serum.fetchOrderBook();
 
-  const settleFunds = async () => {
-    await amm.serum.settleFunds();
+  const cancelOrders = async () => {
+    await amm.serum.cancelAllOrders();
     console.log('done');
     process.exit();
   };
 
-  settleFunds();
+  cancelOrders();
 }
 
 run();
